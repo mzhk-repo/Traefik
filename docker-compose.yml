@@ -1,0 +1,68 @@
+services:
+  # ===================================================
+  # TRAEFIK (Reverse Proxy)
+  # ===================================================
+  traefik:
+    image: traefik:${TRAEFIK_VERSION:-v3.6.8}
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--log.level=INFO"
+      - "--log.filePath=/var/log/traefik/traefik.log"
+      - "--log.format=json"
+      - "--accesslog=true"
+      - "--accesslog.filePath=/var/log/traefik/access.log"
+      - "--accesslog.bufferingsize=100"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.metrics.address=:8082"
+      - "--entrypoints.web.forwardedHeaders.insecure=false"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=${DSPACENET_SUBNET:-172.23.0.0/16}"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entryPoint=metrics"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--metrics.prometheus.addRoutersLabels=true"
+      - "--ping=true"
+    ports:
+      - "${TRAEFIK_BIND_IP:-127.0.0.1}:${TRAEFIK_ENTRYPOINT_PORT:-8080}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${VOL_LOGS_PATH:-/srv/DSpace-volumes/logs}/traefik:/var/log/traefik
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      - proxy-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dash.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.traefik-dash.entrypoints=web"
+      - "traefik.http.routers.traefik-dash.priority=200"
+      - "traefik.http.routers.traefik-dash.service=api@internal"
+      - "traefik.http.routers.traefik-dash.middlewares=traefik-auth,traefik-allow"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}"
+      - "traefik.http.middlewares.traefik-allow.ipallowlist.sourcerange=${TRAEFIK_DASHBOARD_ALLOWLIST}"
+      - "traefik.http.middlewares.forwarded-https.headers.customRequestHeaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.forwarded-https.headers.customRequestHeaders.X-Forwarded-Port=443"
+      - "traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.security-headers.headers.customFrameOptionsValue=${SECURITY_FRAME_OPTIONS:-SAMEORIGIN}"
+      - "traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.security-headers.headers.customResponseHeaders.Content-Security-Policy-Report-Only=${CSP_REPORT_ONLY_POLICY:-default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'}"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  proxy-net:
+    external: true
+    name: proxy-net
