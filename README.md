@@ -13,6 +13,7 @@
 ```bash
 cp .env.example .env
 # відредагуй домен/доступ до dashboard при потребі
+# за потреби онови CSP для зовнішніх інтеграцій, напр. Matomo, через CSP_REPORT_ONLY_POLICY
 
 docker compose up -d
 docker compose ps
