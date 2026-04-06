@@ -1,0 +1,19 @@
+services:
+  traefik:
+    environment:
+      - TRAEFIK_BIND_IP=${TRAEFIK_BIND_IP:-127.0.0.1}
+    ports: !override
+      - target: 80
+        published: ${TRAEFIK_ENTRYPOINT_PORT:-8080}
+        protocol: tcp
+        mode: host
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 2m
+      placement:
+        constraints:
+          - node.labels.app_zone == manager
