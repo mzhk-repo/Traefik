@@ -16,7 +16,7 @@ services:
       - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=proxy-net"
+      - "--providers.docker.network=${EXTERNAL_NETWORK}"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.metrics.address=:8082"
       - "--entrypoints.web.forwardedHeaders.insecure=false"
