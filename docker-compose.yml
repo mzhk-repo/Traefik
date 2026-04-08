@@ -81,5 +81,5 @@ services:
 networks:
   proxy-net:
     external: true
-    name: proxy-net
+    name: ${EXTERNAL_NETWORK}
 
