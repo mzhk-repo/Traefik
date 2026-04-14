@@ -3,3 +3,4 @@
 *.swp
 *~
 archive
+*.decrypted~env.*.enc
