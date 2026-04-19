@@ -39,4 +39,4 @@ services:
 secrets:
   app_env_payload:
     external: true
-    name: ${TRAEFIK_APP_ENV_PAYLOAD_SECRET_NAME:-traefik_app_env_payload_dev_v1}
+    name: ${TRAEFIK_APP_ENV_PAYLOAD_SECRET_NAME}
