@@ -1,0 +1,130 @@
+name: traefik
+services:
+  traefik:
+    command:
+      - --log.level=INFO
+      - --log.filePath=/var/log/traefik/traefik.log
+      - --log.format=json
+      - --accesslog=true
+      - --accesslog.filePath=/var/log/traefik/access.log
+      - --accesslog.bufferingsize=100
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=proxy-net
+      - --entrypoints.web.address=:80
+      - --entrypoints.metrics.address=:8082
+      - --entrypoints.web.forwardedHeaders.insecure=false
+      - --entrypoints.web.forwardedHeaders.trustedIPs=172.23.0.0/16
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entryPoint=metrics
+      - --metrics.prometheus.addEntryPointsLabels=true
+      - --metrics.prometheus.addServicesLabels=true
+      - --metrics.prometheus.addRoutersLabels=true
+      - --ping=true
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 2m0s
+      placement:
+        constraints:
+          - node.labels.app_zone == manager
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        while IFS= read -r $$line || [ -n "$$line" ]; do
+          case "$$line" in
+            ""|\#*) continue ;;
+          esac
+          export "$$line"
+        done < /run/secrets/app_env_payload
+        exec /entrypoint.sh "$$@"
+      - --
+    healthcheck:
+      test:
+        - CMD
+        - traefik
+        - healthcheck
+        - --ping
+      timeout: 3s
+      interval: 10s
+      retries: 12
+      start_period: 10s
+    image: traefik:v3.6.13
+    labels:
+      traefik.enable: "true"
+      traefik.http.middlewares.forwarded-https.headers.customRequestHeaders.X-Forwarded-Port: "443"
+      traefik.http.middlewares.forwarded-https.headers.customRequestHeaders.X-Forwarded-Proto: https
+      traefik.http.middlewares.security-headers.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.security-headers.headers.customFrameOptionsValue: SAMEORIGIN
+      traefik.http.middlewares.security-headers.headers.customResponseHeaders.Content-Security-Policy-Report-Only: default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; script-src 'self' https://matomo.pinokew.buzz; connect-src 'self' https://matomo.pinokew.buzz
+      traefik.http.middlewares.security-headers.headers.referrerPolicy: strict-origin-when-cross-origin
+      traefik.http.middlewares.traefik-allow.ipallowlist.sourcerange: 127.0.0.1/32,172.23.0.0/16
+      traefik.http.middlewares.traefik-dash-root-redirect.redirectregex.permanent: "true"
+      traefik.http.middlewares.traefik-dash-root-redirect.redirectregex.regex: ^https?://([^/]+)/?$$
+      traefik.http.middlewares.traefik-dash-root-redirect.redirectregex.replacement: https://$${1}/dashboard/
+      traefik.http.middlewares.traefik-dash-slash-redirect.redirectregex.permanent: "true"
+      traefik.http.middlewares.traefik-dash-slash-redirect.redirectregex.regex: ^(https?://[^/]+/dashboard)$$
+      traefik.http.middlewares.traefik-dash-slash-redirect.redirectregex.replacement: $${1}/
+      traefik.http.routers.traefik-dash-root.entrypoints: web
+      traefik.http.routers.traefik-dash-root.middlewares: traefik-dash-root-redirect
+      traefik.http.routers.traefik-dash-root.priority: "400"
+      traefik.http.routers.traefik-dash-root.rule: Host(`traefik.pinokew.buzz`) && Path(`/`)
+      traefik.http.routers.traefik-dash-root.service: noop@internal
+      traefik.http.routers.traefik-dash-slash.entrypoints: web
+      traefik.http.routers.traefik-dash-slash.middlewares: traefik-dash-slash-redirect
+      traefik.http.routers.traefik-dash-slash.priority: "300"
+      traefik.http.routers.traefik-dash-slash.rule: Host(`traefik.pinokew.buzz`) && Path(`/dashboard`)
+      traefik.http.routers.traefik-dash-slash.service: noop@internal
+      traefik.http.routers.traefik-dash.entrypoints: web
+      traefik.http.routers.traefik-dash.middlewares: traefik-allow
+      traefik.http.routers.traefik-dash.priority: "200"
+      traefik.http.routers.traefik-dash.rule: Host(`traefik.pinokew.buzz`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
+      traefik.http.routers.traefik-dash.service: api@internal
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      proxy-net: null
+    ports:
+      - mode: host
+        target: 80
+        published: "8080"
+        protocol: tcp
+    secrets:
+      - source: app_env_payload
+        target: app_env_payload
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /srv/DSpace-volumes/logs/traefik
+        target: /var/log/traefik
+        bind: {}
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /etc/timezone
+        target: /etc/timezone
+        read_only: true
+        bind: {}
+networks:
+  proxy-net:
+    name: proxy-net
+    external: true
+secrets:
+  app_env_payload:
+    name: traefik_app_env_payload_dev_v1
+    external: true
