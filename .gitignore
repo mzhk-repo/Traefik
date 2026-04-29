@@ -4,3 +4,6 @@
 *~
 archive
 *.decrypted~env.*.enc
+chat.json
+docs/AGENTS.md
+docs/hello-world.md

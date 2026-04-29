@@ -76,6 +76,25 @@ run_ansible_secrets_if_configured() {
     --tags secrets
 }
 
+run_deploy_adjacent_scripts() {
+  local init_script
+  init_script="${SCRIPT_DIR}/init-volumes.sh"
+
+  if [[ ! -f "${init_script}" ]]; then
+    log "ERROR: deploy-adjacent script not found: ${init_script}"
+    exit 1
+  fi
+
+  if [[ ! -x "${init_script}" ]]; then
+    log "Running deploy-adjacent script via bash: ${init_script}"
+    ORCHESTRATOR_ENV_FILE="${ENV_FILE}" bash "${init_script}"
+    return 0
+  fi
+
+  log "Running deploy-adjacent script: ${init_script}"
+  ORCHESTRATOR_ENV_FILE="${ENV_FILE}" "${init_script}"
+}
+
 deploy_swarm() {
   local compose_file swarm_file raw_manifest deploy_manifest
 
@@ -97,7 +116,7 @@ deploy_swarm() {
   if [[ ! -f "${ENV_FILE}" ]]; then
     if [[ -f ".env" ]]; then
       ENV_FILE=".env"
-      log "Env file ${ORCHESTRATOR_ENV_FILE:-/tmp/env.decrypted} not found; fallback to .env"
+      log "WARNING: env.*.enc не знайдено або ORCHESTRATOR_ENV_FILE не передано. Fallback на локальний .env — тільки для dev-середовища."
     else
       log "ERROR: env file not found (${ORCHESTRATOR_ENV_FILE:-/tmp/env.decrypted}) and .env missing"
       exit 1
@@ -105,6 +124,7 @@ deploy_swarm() {
   fi
 
   run_ansible_secrets_if_configured
+  run_deploy_adjacent_scripts
 
   log "Rendering Swarm manifest (stack=${STACK_NAME}, env_file=${ENV_FILE})"
   docker compose --env-file "${ENV_FILE}" \

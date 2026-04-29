@@ -4,30 +4,32 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-ENV_FILE="${ENV_FILE:-${PROJECT_ROOT}/.env}"
-if [[ ! -f "${ENV_FILE}" && -f "${PROJECT_ROOT}/archive/.env" ]]; then
-  ENV_FILE="${PROJECT_ROOT}/archive/.env"
+read_env_var() {
+  local key="$1"
+  local file="$2"
+  grep -m1 "^${key}=" "${file}" \
+    | cut -d= -f2- \
+    | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+}
+
+ENV_FILE="${ORCHESTRATOR_ENV_FILE:-}"
+if [[ -z "${ENV_FILE}" || ! -f "${ENV_FILE}" ]]; then
+  if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+    ENV_FILE="${PROJECT_ROOT}/.env"
+    echo "[init-volumes] WARNING: ORCHESTRATOR_ENV_FILE не передано. Fallback на .env — тільки для dev." >&2
+  else
+    echo "[init-volumes] ERROR: env file не знайдено. Передай ORCHESTRATOR_ENV_FILE або поклади .env." >&2
+    exit 1
+  fi
 fi
 
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "[init-volumes] Env file not found. Checked: ${PROJECT_ROOT}/.env and ${PROJECT_ROOT}/archive/.env" >&2
-  exit 1
-fi
-
-vol_line="$(grep -E '^[[:space:]]*VOL_LOGS_PATH[[:space:]]*=' "${ENV_FILE}" | tail -n1 || true)"
-if [[ -z "${vol_line}" ]]; then
+vol_logs_path="$(read_env_var "VOL_LOGS_PATH" "${ENV_FILE}")"
+if [[ -z "${vol_logs_path}" ]]; then
   echo "[init-volumes] VOL_LOGS_PATH is missing in ${ENV_FILE}" >&2
   exit 1
 fi
 
-vol_logs_path="${vol_line#*=}"
-# Remove trailing inline comments like: /path # comment
 vol_logs_path="$(printf '%s' "${vol_logs_path}" | sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//')"
-
-# Strip optional surrounding quotes
-if [[ "${vol_logs_path}" =~ ^\".*\"$ || "${vol_logs_path}" =~ ^\'.*\'$ ]]; then
-  vol_logs_path="${vol_logs_path:1:${#vol_logs_path}-2}"
-fi
 
 if [[ -z "${vol_logs_path}" ]]; then
   echo "[init-volumes] VOL_LOGS_PATH resolved to empty value from ${ENV_FILE}" >&2
