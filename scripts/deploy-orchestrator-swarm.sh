@@ -7,6 +7,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 MODE="${ORCHESTRATOR_MODE:-noop}"
 STACK_NAME="${STACK_NAME:-traefik}"
 ENV_FILE="${ORCHESTRATOR_ENV_FILE:-/tmp/env.decrypted}"
+VERSIONED_ENV_FILE=""
 
 log() {
   printf '[deploy-orchestrator] %s\n' "$*"
@@ -95,6 +96,33 @@ run_deploy_adjacent_scripts() {
   ORCHESTRATOR_ENV_FILE="${ENV_FILE}" "${init_script}"
 }
 
+render_versioned_env_secrets() {
+  local render_script
+  render_script="${SCRIPT_DIR}/render-versioned-env-secret.sh"
+
+  if [[ ! -f "${render_script}" ]]; then
+    log "ERROR: versioned env secret renderer not found: ${render_script}"
+    exit 1
+  fi
+
+  VERSIONED_ENV_FILE="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.env.rendered.XXXXXX")"
+  chmod 600 "${VERSIONED_ENV_FILE}"
+  cp "${ENV_FILE}" "${VERSIONED_ENV_FILE}"
+
+  log "Rendering versioned Docker secrets from env payload"
+  if [[ ! -x "${render_script}" ]]; then
+    ORCHESTRATOR_ENV_FILE="${ENV_FILE}" bash "${render_script}" \
+      --env-file "${ENV_FILE}" \
+      --write-env-file "${VERSIONED_ENV_FILE}" >/dev/null
+  else
+    ORCHESTRATOR_ENV_FILE="${ENV_FILE}" "${render_script}" \
+      --env-file "${ENV_FILE}" \
+      --write-env-file "${VERSIONED_ENV_FILE}" >/dev/null
+  fi
+
+  ENV_FILE="${VERSIONED_ENV_FILE}"
+}
+
 deploy_swarm() {
   local compose_file swarm_file raw_manifest deploy_manifest
 
@@ -102,7 +130,7 @@ deploy_swarm() {
   swarm_file="docker-compose.swarm.yml"
   raw_manifest="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.stack.raw.XXXXXX.yml")"
   deploy_manifest="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.stack.deploy.XXXXXX.yml")"
-  trap 'rm -f "${raw_manifest:-}" "${deploy_manifest:-}"' RETURN
+  trap 'rm -f "${raw_manifest:-}" "${deploy_manifest:-}" "${VERSIONED_ENV_FILE:-}"' RETURN
 
   if [[ -z "${compose_file}" ]]; then
     log "ERROR: compose file not found (expected docker-compose.yaml|yml)"
@@ -124,6 +152,7 @@ deploy_swarm() {
   fi
 
   run_ansible_secrets_if_configured
+  render_versioned_env_secrets
   run_deploy_adjacent_scripts
 
   log "Rendering Swarm manifest (stack=${STACK_NAME}, env_file=${ENV_FILE})"

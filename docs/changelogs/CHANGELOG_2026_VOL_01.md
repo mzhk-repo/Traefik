@@ -21,3 +21,10 @@
 - **Docs:** Оновлено також таблицю у розділі "Структура docs/" для явного посилання на `CI-CD.md` (Фаза 8) із деталізованим описом flow.
 - **Notes:** Це чисто планова/документаційна зміна без інфраструктурних модифікацій; фактична імплементація (Ansible playbook updates, shared-ci-cd.yml rewrite, per-repo script creation) залишається на рівні Фази 8 under DoD execution notes.
 
+
+# 2026-05-07 — Versioned Docker secret renderer for Traefik Swarm env payload
+
+- **Context:** Для Swarm-деплою Traefik потрібно створювати immutable Docker secret для runtime env payload з hash-based назвою, щоб зміна env payload змінювала Swarm service spec і гарантовано підхоплювалася під час `docker stack deploy`.
+- **Change:** Додано `scripts/render-versioned-env-secret.sh` за аналогією з DSpace-реалізацією, але адаптовано під Traefik: рендериться `TRAEFIK_APP_ENV_PAYLOAD_SECRET_NAME`, generated key виключається з payload, назва secret формується як `traefik_app_env_payload_<sha256:12>`, підтримано `--env-file`, `--write-env-file`, `--print-export` і fallback на `.env` тільки для локального dev.
+- **Change:** `scripts/deploy-orchestrator-swarm.sh` тепер перед `docker compose config` створює versioned env secret, пише згенеровану назву у тимчасову копію env-файлу та передає саме її у deploy-adjacent scripts і `docker compose --env-file`; тимчасові файли прибираються через `trap`.
+- **Verification:** Виконано `bash -n` для нового renderer і swarm-оркестратора. Додатково виконано mock-тести без реального Docker daemon: перевірено відповідність hash у secret name фактичному payload, зміну hash після зміни env, виключення `TRAEFIK_APP_ENV_PAYLOAD_SECRET_NAME` з payload і передачу rendered env у `docker compose`.
