@@ -78,8 +78,9 @@ run_ansible_secrets_if_configured() {
 }
 
 run_deploy_adjacent_scripts() {
-  local init_script
+  local init_script logrotate_script
   init_script="${SCRIPT_DIR}/init-volumes.sh"
+  logrotate_script="${SCRIPT_DIR}/install-logrotate.sh"
 
   if [[ ! -f "${init_script}" ]]; then
     log "ERROR: deploy-adjacent script not found: ${init_script}"
@@ -94,6 +95,20 @@ run_deploy_adjacent_scripts() {
 
   log "Running deploy-adjacent script: ${init_script}"
   ORCHESTRATOR_ENV_FILE="${ENV_FILE}" "${init_script}"
+
+  if [[ ! -f "${logrotate_script}" ]]; then
+    log "ERROR: deploy-adjacent script not found: ${logrotate_script}"
+    exit 1
+  fi
+
+  if [[ ! -x "${logrotate_script}" ]]; then
+    log "Running deploy-adjacent script via bash: ${logrotate_script}"
+    ORCHESTRATOR_ENV_FILE="${ENV_FILE}" bash "${logrotate_script}"
+    return 0
+  fi
+
+  log "Running deploy-adjacent script: ${logrotate_script}"
+  ORCHESTRATOR_ENV_FILE="${ENV_FILE}" "${logrotate_script}"
 }
 
 render_versioned_env_secrets() {

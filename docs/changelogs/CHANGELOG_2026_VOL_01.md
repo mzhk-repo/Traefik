@@ -35,3 +35,12 @@
 - **Context:** Traefik використовується як reverse proxy за Cloudflare Tunnel, а зовнішній доступ має проходити через tunnel, не через відкритий host-порт Traefik.
 - **Change:** Прибрано `ports` mapping для Traefik з `docker-compose.yml` та Swarm override у `docker-compose.swarm.yml`, щоб HTTP entrypoint `:80` був доступний тільки всередині Docker-мережі.
 - **Docs:** Оновлено `README.md`: Cloudflare Tunnel має звертатися до `http://traefik:80` у `proxy-net`, а smoke-check виконується з контейнера в тій самій мережі.
+
+
+# 2026-05-10 — Traefik access log filtering and host logrotate policy
+
+- **Context:** `/data/Traefik/logs/traefik/access.log` може швидко рости, якщо логувати кожен запит через reverse proxy.
+- **Change:** Додано Traefik access log filters: за замовчуванням логуються тільки `500-599`, retry attempts і запити довші за `TRAEFIK_ACCESSLOG_MIN_DURATION` (`5s` default).
+- **Change:** Додано `scripts/install-logrotate.sh`, який ідемпотентно встановлює host policy `/etc/logrotate.d/traefik` для `${VOL_LOGS_PATH}/traefik/*.log` з `su root root`, `daily`, `maxsize 100M`, `rotate 14`, `compress`, `copytruncate`.
+- **Change:** `scripts/deploy-orchestrator-swarm.sh` запускає `install-logrotate.sh` як deploy-adjacent step після `init-volumes.sh`.
+- **Docs:** Оновлено `README.md` і `docs/scripts_runbook.md` з політикою access log/logrotate.
