@@ -28,3 +28,10 @@
 - **Change:** Додано `scripts/render-versioned-env-secret.sh` за аналогією з DSpace-реалізацією, але адаптовано під Traefik: рендериться `TRAEFIK_APP_ENV_PAYLOAD_SECRET_NAME`, generated key виключається з payload, назва secret формується як `traefik_app_env_payload_<sha256:12>`, підтримано `--env-file`, `--write-env-file`, `--print-export` і fallback на `.env` тільки для локального dev.
 - **Change:** `scripts/deploy-orchestrator-swarm.sh` тепер перед `docker compose config` створює versioned env secret, пише згенеровану назву у тимчасову копію env-файлу та передає саме її у deploy-adjacent scripts і `docker compose --env-file`; тимчасові файли прибираються через `trap`.
 - **Verification:** Виконано `bash -n` для нового renderer і swarm-оркестратора. Додатково виконано mock-тести без реального Docker daemon: перевірено відповідність hash у secret name фактичному payload, зміну hash після зміни env, виключення `TRAEFIK_APP_ENV_PAYLOAD_SECRET_NAME` з payload і передачу rendered env у `docker compose`.
+
+
+# 2026-05-10 — Removed Traefik host-published 8080 entrypoint
+
+- **Context:** Traefik використовується як reverse proxy за Cloudflare Tunnel, а зовнішній доступ має проходити через tunnel, не через відкритий host-порт Traefik.
+- **Change:** Прибрано `ports` mapping для Traefik з `docker-compose.yml` та Swarm override у `docker-compose.swarm.yml`, щоб HTTP entrypoint `:80` був доступний тільки всередині Docker-мережі.
+- **Docs:** Оновлено `README.md`: Cloudflare Tunnel має звертатися до `http://traefik:80` у `proxy-net`, а smoke-check виконується з контейнера в тій самій мережі.

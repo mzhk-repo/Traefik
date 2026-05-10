@@ -6,7 +6,7 @@
 
 `Cloudflare Tunnel -> Traefik -> dspace-angular / dspace`
 
-Стек працює в зовнішній Docker-мережі `proxy-net`.
+Стек працює в зовнішній Docker-мережі `proxy-net`. Traefik не публікує HTTP entrypoint на host-порт; Cloudflare Tunnel має бути підключений до тієї ж Docker-мережі та звертатися до Traefik напряму як до Docker-сервісу.
 
 ## Швидкий старт
 
@@ -27,8 +27,11 @@ docker compose ps
 ## Перевірка
 
 ```bash
-curl -H 'Host: <DSPACE_HOSTNAME>' http://127.0.0.1:8080/
-curl -H 'Host: <DSPACE_HOSTNAME>' http://127.0.0.1:8080/server/api/core/sites
+docker run --rm --network proxy-net curlimages/curl:latest \
+  -H 'Host: <DSPACE_HOSTNAME>' http://traefik/
+
+docker run --rm --network proxy-net curlimages/curl:latest \
+  -H 'Host: <DSPACE_HOSTNAME>' http://traefik/server/api/core/sites
 ```
 
 Очікування: HTTP `200` для UI і API.
@@ -42,7 +45,7 @@ curl -H 'Host: <DSPACE_HOSTNAME>' http://127.0.0.1:8080/server/api/core/sites
 	- Policy: `Allow` для Azure AD identity provider (потрібні групи/користувачі)
 2. У Tunnel (`Public Hostname`) налаштуй маршрут на Traefik:
 	- Hostname: `traefik.pinokew.buzz`
-	- Service: `http://127.0.0.1:8080` (або твій локальний порт Traefik)
+	- Service: `http://traefik:80`
 	- `HTTP Host Header`: `traefik.pinokew.buzz`
 3. Перезапусти стек:
 

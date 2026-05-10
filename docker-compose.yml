@@ -27,8 +27,6 @@ services:
       - "--metrics.prometheus.addServicesLabels=true"
       - "--metrics.prometheus.addRoutersLabels=true"
       - "--ping=true"
-    ports:
-      - "${TRAEFIK_BIND_IP:-127.0.0.1}:${TRAEFIK_ENTRYPOINT_PORT:-8080}:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${VOL_LOGS_PATH:-/srv/DSpace-volumes/logs}/traefik:/var/log/traefik
@@ -82,4 +80,3 @@ networks:
   proxy-net:
     external: true
     name: ${EXTERNAL_NETWORK}
-
