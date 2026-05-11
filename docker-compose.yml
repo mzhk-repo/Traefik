@@ -61,6 +61,7 @@ services:
         - "traefik.http.routers.traefik-dash.priority=200"
         - "traefik.http.routers.traefik-dash.service=api@internal"
         - "traefik.http.routers.traefik-dash.middlewares=traefik-allow"
+        - "traefik.http.services.traefik.loadbalancer.server.port=8080"
         - "traefik.http.middlewares.traefik-allow.ipallowlist.sourcerange=${TRAEFIK_DASHBOARD_ALLOWLIST}"
         - "traefik.http.middlewares.forwarded-https.headers.customRequestHeaders.X-Forwarded-Proto=https"
         - "traefik.http.middlewares.forwarded-https.headers.customRequestHeaders.X-Forwarded-Port=443"
