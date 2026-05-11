@@ -44,3 +44,13 @@
 - **Change:** Додано `scripts/install-logrotate.sh`, який ідемпотентно встановлює host policy `/etc/logrotate.d/traefik` для `${VOL_LOGS_PATH}/traefik/*.log` з `su root root`, `daily`, `maxsize 100M`, `rotate 14`, `compress`, `copytruncate`.
 - **Change:** `scripts/deploy-orchestrator-swarm.sh` запускає `install-logrotate.sh` як deploy-adjacent step після `init-volumes.sh`.
 - **Docs:** Оновлено `README.md` і `docs/scripts_runbook.md` з політикою access log/logrotate.
+
+
+# 2026-05-11 — Traefik Swarm provider labels migration
+
+- **Context:** Для Docker Swarm Traefik має читати routing labels із service labels (`deploy.labels`), а не з top-level container labels.
+- **Change:** `docker-compose.yml` Traefik перемкнуто з Docker provider на Swarm provider (`providers.swarm=true`, `providers.swarm.exposedbydefault=false`, `providers.swarm.network=${EXTERNAL_NETWORK}`).
+- **Change:** Traefik dashboard labels перенесено у `deploy.labels`.
+- **Change:** У сервісних compose-файлах DSpace, KDV Integrator, Koha, Matomo та VictoriaMetrics/Grafana Traefik labels перенесено з top-level `labels` у `deploy.labels`; наявні `networks` блоки та підключення сервісів до Docker-мереж не змінювались.
+- **Change:** DSpace router middlewares більше не посилаються на `@docker`, щоб вони резолвились у Swarm provider після переходу Traefik на `providers.swarm`.
+- **Verification:** Виконано `docker compose config --quiet` для Traefik і DSpace; `docker compose --env-file .env.example config --quiet` для KDV Integrator і Koha; `docker compose --env-file .env.example config --quiet --no-env-resolution` для Matomo та VictoriaMetrics/Grafana, бо їхні service-level `env_file: .env` файли відсутні у робочих директоріях. Додатково перевірено відсутність top-level `labels`, `@docker` middleware refs і `providers.docker` у змінених compose-файлах.
