@@ -22,11 +22,34 @@ rm -f /tmp/env.test
 - У виводі є рядок `Done: <VOL_LOGS_PATH>/traefik`
 - `echo $?` повертає `0`
 
+## `scripts/install-logrotate.sh` (Категорія 1б, deploy-adjacent)
+
+### Бізнес-логіка
+- Читає `VOL_LOGS_PATH` з env-файлу.
+- Встановлює host logrotate policy у `/etc/logrotate.d/traefik`.
+- Ротує `${VOL_LOGS_PATH}/traefik/*.log` з дефолтами: `su root root`, `daily`, `maxsize 100M`, `rotate 14`, `compress`, `copytruncate`.
+- Перед встановленням перевіряє policy через `logrotate -d`.
+
+### Ручний запуск (перевірений сценарій)
+> Потрібні права `root` або доступний `sudo`, бо цільовий файл лежить у `/etc/logrotate.d`.
+
+```bash
+sops --decrypt --input-type dotenv --output-type dotenv env.dev.enc > /tmp/env.test
+chmod 600 /tmp/env.test
+ORCHESTRATOR_ENV_FILE=/tmp/env.test bash scripts/install-logrotate.sh
+echo $?
+rm -f /tmp/env.test
+```
+
+Очікуваний результат:
+- У виводі є рядок `Done: /etc/logrotate.d/traefik`
+- `echo $?` повертає `0`
+
 ## `scripts/deploy-orchestrator-swarm.sh` (Swarm orchestrator)
 
 ### Бізнес-логіка
 - Для `ORCHESTRATOR_MODE=swarm` виконує Swarm-деплой стека.
-- Перед рендерингом compose-манифесту запускає `scripts/init-volumes.sh`.
+- Перед рендерингом compose-манифесту запускає `scripts/init-volumes.sh` і `scripts/install-logrotate.sh`.
 - За відсутності `INFRA_REPO_PATH` пропускає ansible refresh secrets з informational-логом (це не помилка).
 
 ### Ручний запуск (мінімальна перевірка)
@@ -41,3 +64,4 @@ rm -f /tmp/env.test
 Пояснення по логам:
 - `INFRA_REPO_PATH is not set; skip ansible secrets refresh` — очікувана поведінка, якщо змінна не задана.
 - `Running deploy-adjacent script: /opt/Traefik/scripts/init-volumes.sh` — службовий лог перед запуском `init-volumes.sh`.
+- `Running deploy-adjacent script: /opt/Traefik/scripts/install-logrotate.sh` — службовий лог перед встановленням logrotate policy.

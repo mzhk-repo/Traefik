@@ -21,3 +21,38 @@
 - **Docs:** Оновлено також таблицю у розділі "Структура docs/" для явного посилання на `CI-CD.md` (Фаза 8) із деталізованим описом flow.
 - **Notes:** Це чисто планова/документаційна зміна без інфраструктурних модифікацій; фактична імплементація (Ansible playbook updates, shared-ci-cd.yml rewrite, per-repo script creation) залишається на рівні Фази 8 under DoD execution notes.
 
+
+# 2026-05-07 — Versioned Docker secret renderer for Traefik Swarm env payload
+
+- **Context:** Для Swarm-деплою Traefik потрібно створювати immutable Docker secret для runtime env payload з hash-based назвою, щоб зміна env payload змінювала Swarm service spec і гарантовано підхоплювалася під час `docker stack deploy`.
+- **Change:** Додано `scripts/render-versioned-env-secret.sh` за аналогією з DSpace-реалізацією, але адаптовано під Traefik: рендериться `TRAEFIK_APP_ENV_PAYLOAD_SECRET_NAME`, generated key виключається з payload, назва secret формується як `traefik_app_env_payload_<sha256:12>`, підтримано `--env-file`, `--write-env-file`, `--print-export` і fallback на `.env` тільки для локального dev.
+- **Change:** `scripts/deploy-orchestrator-swarm.sh` тепер перед `docker compose config` створює versioned env secret, пише згенеровану назву у тимчасову копію env-файлу та передає саме її у deploy-adjacent scripts і `docker compose --env-file`; тимчасові файли прибираються через `trap`.
+- **Verification:** Виконано `bash -n` для нового renderer і swarm-оркестратора. Додатково виконано mock-тести без реального Docker daemon: перевірено відповідність hash у secret name фактичному payload, зміну hash після зміни env, виключення `TRAEFIK_APP_ENV_PAYLOAD_SECRET_NAME` з payload і передачу rendered env у `docker compose`.
+
+
+# 2026-05-10 — Removed Traefik host-published 8080 entrypoint
+
+- **Context:** Traefik використовується як reverse proxy за Cloudflare Tunnel, а зовнішній доступ має проходити через tunnel, не через відкритий host-порт Traefik.
+- **Change:** Прибрано `ports` mapping для Traefik з `docker-compose.yml` та Swarm override у `docker-compose.swarm.yml`, щоб HTTP entrypoint `:80` був доступний тільки всередині Docker-мережі.
+- **Docs:** Оновлено `README.md`: Cloudflare Tunnel має звертатися до `http://traefik:80` у `proxy-net`, а smoke-check виконується з контейнера в тій самій мережі.
+
+
+# 2026-05-10 — Traefik access log filtering and host logrotate policy
+
+- **Context:** `/data/Traefik/logs/traefik/access.log` може швидко рости, якщо логувати кожен запит через reverse proxy.
+- **Change:** Додано Traefik access log filters: за замовчуванням логуються тільки `500-599`, retry attempts і запити довші за `TRAEFIK_ACCESSLOG_MIN_DURATION` (`5s` default).
+- **Change:** Додано `scripts/install-logrotate.sh`, який ідемпотентно встановлює host policy `/etc/logrotate.d/traefik` для `${VOL_LOGS_PATH}/traefik/*.log` з `su root root`, `daily`, `maxsize 100M`, `rotate 14`, `compress`, `copytruncate`.
+- **Change:** `scripts/deploy-orchestrator-swarm.sh` запускає `install-logrotate.sh` як deploy-adjacent step після `init-volumes.sh`.
+- **Docs:** Оновлено `README.md` і `docs/scripts_runbook.md` з політикою access log/logrotate.
+
+
+# 2026-05-11 — Traefik Swarm provider labels migration
+
+- **Context:** Для Docker Swarm Traefik має читати routing labels із service labels (`deploy.labels`), а не з top-level container labels.
+- **Change:** `docker-compose.yml` Traefik перемкнуто з Docker provider на Swarm provider (`providers.swarm=true`, `providers.swarm.exposedbydefault=false`, `providers.swarm.network=${EXTERNAL_NETWORK}`).
+- **Change:** Traefik dashboard labels перенесено у `deploy.labels`.
+- **Change:** У сервісних compose-файлах DSpace, KDV Integrator, Koha, Matomo та VictoriaMetrics/Grafana Traefik labels перенесено з top-level `labels` у `deploy.labels`; наявні `networks` блоки та підключення сервісів до Docker-мереж не змінювались.
+- **Change:** DSpace router middlewares більше не посилаються на `@docker`, щоб вони резолвились у Swarm provider після переходу Traefik на `providers.swarm`.
+- **Verification:** Виконано `docker compose config --quiet` для Traefik і DSpace; `docker compose --env-file .env.example config --quiet` для KDV Integrator і Koha; `docker compose --env-file .env.example config --quiet --no-env-resolution` для Matomo та VictoriaMetrics/Grafana, бо їхні service-level `env_file: .env` файли відсутні у робочих директоріях. Додатково перевірено відсутність top-level `labels`, `@docker` middleware refs і `providers.docker` у змінених compose-файлах.
+- **Fix:** Після runtime-перевірки Swarm provider додано explicit dummy service port label для Traefik dashboard/API (`traefik.http.services.traefik.loadbalancer.server.port=8080`), щоб Traefik не відкидав власний service config з помилкою `port is missing`.
+- **Fix:** Застарілі `traefik.docker.network` labels замінено на `traefik.swarm.network` у Traefik-managed Swarm compose-файлах без зміни Docker `networks` блоків.
