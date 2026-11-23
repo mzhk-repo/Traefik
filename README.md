@@ -8,6 +8,22 @@
 
 Стек працює в зовнішній Docker-мережі `proxy-net`. Traefik не публікує HTTP entrypoint на host-порт; Cloudflare Tunnel має бути підключений до тієї ж Docker-мережі та звертатися до Traefik напряму як до Docker-сервісу.
 
+## OpenCloud integration
+
+OpenCloud must join the same external overlay network and expose its Swarm service
+to the Traefik provider using service labels. Route its hostname through Cloudflare
+Tunnel to `http://traefik:80`; TLS terminates at Cloudflare, so the `web` router
+itself uses HTTP. The OpenCloud backend protocol and its certificate trust must
+be configured consistently with the service. Do not attach a buffering middleware
+to its router: TUS upload chunks need to stream through Traefik.
+
+The shared `web` entrypoint allows five minutes to read each complete request,
+including its body. This affects every service on that entrypoint. The default
+backend forwarding timeouts remain unchanged: connection 30 seconds, response
+headers unlimited, idle connection 90 seconds. Verify OpenCloud uploads and
+existing services after deployment; Cloudflare may impose additional request
+size and timeout limits.
+
 ## Швидкий старт
 
 ```bash
