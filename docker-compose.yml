@@ -21,6 +21,7 @@ services:
       - "--providers.swarm.exposedbydefault=false"
       - "--providers.swarm.network=${EXTERNAL_NETWORK}"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.transport.respondingtimeouts.readtimeout=5m"
       - "--entrypoints.metrics.address=:8082"
       - "--entrypoints.web.forwardedHeaders.insecure=false"
       - "--entrypoints.web.forwardedHeaders.trustedIPs=${DSPACENET_SUBNET:-172.23.0.0/16}"
@@ -34,7 +35,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${VOL_LOGS_PATH:-/srv/DSpace-volumes/logs}/traefik:/var/log/traefik
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
     networks:
       - proxy-net
     deploy:
