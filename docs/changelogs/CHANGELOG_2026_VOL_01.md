@@ -62,3 +62,9 @@
 - **Context:** OpenCloud TUS uploads share the existing Cloudflare Tunnel and Traefik `web` entrypoint with other services.
 - **Change:** Set the shared entrypoint request read timeout to five minutes and documented the routing, TLS termination, streaming and forwarding timeout assumptions.
 - **Verification:** `docker compose config --quiet` passed for the combined Traefik Swarm configuration with placeholder values; `git diff --check` passed. Live acceptance is pending. OpenCloud service labels and network attachment are still required in its repository.
+
+# 2026-11-25 — Remove obsolete timezone file mount
+
+- **Context:** Swarm rejected Traefik tasks after the host upgrade because `/etc/timezone` was absent.
+- **Change:** Removed the `/etc/timezone` bind mount; the existing read-only `/etc/localtime` mount remains.
+- **Verification:** The host's `/etc/localtime` points to `Europe/Kyiv`. Deployment and runtime acceptance remain pending.

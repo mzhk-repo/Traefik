@@ -35,7 +35,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${VOL_LOGS_PATH:-/srv/DSpace-volumes/logs}/traefik:/var/log/traefik
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
     networks:
       - proxy-net
     deploy:
